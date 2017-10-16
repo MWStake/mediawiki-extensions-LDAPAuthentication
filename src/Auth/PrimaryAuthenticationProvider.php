@@ -5,8 +5,8 @@ namespace MediaWiki\Extension\LDAPAuthentication\Auth;
 use MediaWiki\Auth\AbstractPasswordPrimaryAuthenticationProvider;
 use MediaWiki\Auth\LocalPasswordPrimaryAuthenticationProvider;
 use MediaWiki\Auth\AuthenticationRequest;
-use MediaWiki\Auth\AuthenticationResponse;
 use MediaWiki\Extension\LDAPProvider\ClientFactory;
+use MediaWiki\Extension\LDAPProvider\UserDomainStore;
 
 class PrimaryAuthenticationProvider extends LocalPasswordPrimaryAuthenticationProvider {
 	/**
@@ -38,7 +38,10 @@ class PrimaryAuthenticationProvider extends LocalPasswordPrimaryAuthenticationPr
 		if( $selectedDomain === 'local' ) {
 			return AuthenticationResponse::newAbstain();
 		}
-
+		return AuthenticationResponse::newPass(
+			$req->username,
+			$selectedDomain
+		);
 		$client = ClientFactory::getInstance()->getForDomain( $selectedDomain );
 		$isAuthenticated = $client->canBindAs( $req->username, $req->password );
 
@@ -48,6 +51,25 @@ class PrimaryAuthenticationProvider extends LocalPasswordPrimaryAuthenticationPr
 			);
 		}
 
-		return AuthenticationResponse::newPass();
+		return AuthenticationResponse::newPass(
+			$req->username,
+			$selectedDomain
+		);
+	}
+
+	/**
+	 *
+	 * @param \User $user
+	 * @param \User $creator
+	 * @param AuthenticationResponse $res
+	 * @return null
+	 */
+	public function finishAccountCreation( $user, $creator, AuthenticationResponse $res ) {
+		$parentReturn = parent::finishAccountCreation( $user, $creator, $res );
+
+		$userDomainStore = new UserDomainStore();
+		$userDomainStore->setDomainForUser( $user, $res->domain );
+
+		return $parentReturn;
 	}
 }
